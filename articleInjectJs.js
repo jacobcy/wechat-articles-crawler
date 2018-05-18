@@ -26,7 +26,7 @@ socket.on('connect', function () {
         var readNum = $('#readNum3').text().trim();
 
         if (!readNum) return;
-
+        var content = $('#js_content').html().trim();
         var likeNum = $('#likeNum3').text().trim();
         var postUser = $('#post-user').text().trim();
         var postDate = $('#post-date').text().trim() || $('#publish_time').text().trim();
@@ -40,7 +40,8 @@ socket.on('connect', function () {
             postUser: postUser,
             postDate: postDate,
             activityName: activityName,
-            js_share_source: js_share_source
+            js_share_source: js_share_source,
+            content: content
         });
     }, 1000);
 
