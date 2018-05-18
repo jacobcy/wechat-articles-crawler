@@ -2,6 +2,7 @@ const Koa = require('Koa');
 const Router = require('koa-router');
 const fs = require('fs');
 const ip = require('ip').address();
+var h2m = require('h2m')
 
 const app = new Koa();
 const moment = require('moment');
@@ -28,7 +29,6 @@ router.get('/', async (ctx, next) => {
     ctx.body = fs.readFileSync('./result.html', 'utf-8');
 })
 
-
 app.use(router.routes());
 
 server.listen(9000);
@@ -45,6 +45,23 @@ wechatIo.on('connection', function (socket) {
             ourl: articles[index].content_url,
             author: articles[index].author
         }, crawData);
+
+
+        let cot = newData.content;
+        /*
+        fs.writeFile(`out_files\\html\\${newData.otitle}.html`, cot, function (err) {
+            if (err) {
+                return console.error(err);
+            }
+        });
+        */
+        cot = h2m(cot);
+        fs.writeFile(`out_files\\md\\${newData.otitle}.md`, cot, function (err) {
+            if (err) {
+                return console.error(err);
+            }
+            console.log("success for:", newData.otitle);
+        });
 
         socket.emit('success');
 
@@ -72,9 +89,11 @@ wechatIo.on('connection', function (socket) {
 
 });
 
+var jqueryFile = fs.readFileSync('./jquery.min.js', 'utf-8')
+var socketFile = fs.readFileSync('./socket.io.js', 'utf-8')
 
 function injectJquery(body) {
-    return body.replace(/<\/head>/g, '<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script><script src="https://cdn.bootcss.com/socket.io/2.0.4/socket.io.js"></script></head>')
+    return body.replace(/<\/head>/g, `<script>${jqueryFile}</script><script>${socketFile}</script></head>`)
 }
 
 var injectJsFile = fs.readFileSync('./injectJs.js', 'utf-8').replace('{$IP}', ip);
@@ -82,7 +101,8 @@ var articleInjectJsFile = fs.readFileSync('./articleInjectJs.js', 'utf-8').repla
 var injectJs = `<script id="injectJs" type="text/javascript">${injectJsFile}</script>`;
 var articleInjectJs = `<script id="injectJs" type="text/javascript">${articleInjectJsFile}</script>`;
 var fakeImg = fs.readFileSync('./fake.png');
-const maxLength = 3000;
+const maxLength = 30;
+
 module.exports = {
     summary: 'wechat articles crawler',
     *beforeSendRequest(requestDetail) {
@@ -213,6 +233,13 @@ module.exports = {
 function fetchListEnd_StartArticle() {
     console.log('最终获取文章的列表总数： ', articles.length);
     wechatIo.emit('url', {url: articles[0].content_url, index: 0, total: articles.length});
+
+    fs.writeFile('out_files\\result.json', JSON.stringify(articles, null, "\t"), function (err) {
+        if (err) {
+            return console.error(err); 
+        }
+        console.log("数据写入成功!", process.cwd() + '\\result.json'); 
+    });
 }
 
 
