@@ -1,4 +1,4 @@
-const Koa = require('Koa');
+const Koa = require('koa');
 const Router = require('koa-router');
 const fs = require('fs');
 const ip = require('ip').address();
@@ -34,7 +34,7 @@ router.get('/', async (ctx, next) => {
 app.use(router.routes());
 
 server.listen(9000);
-require("openurl").open("http://localhost:9000");
+//require("openurl").open("http://localhost:9000");
 
 let wechatIo = io.of('/wechat'), resultIo = io.of('/result');
 wechatIo.on('connection', function (socket) {
