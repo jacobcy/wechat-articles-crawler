@@ -2,7 +2,9 @@ const Koa = require('Koa');
 const Router = require('koa-router');
 const fs = require('fs');
 const ip = require('ip').address();
-var h2m = require('h2m')
+const h2m = require('h2m')
+const path = require('path');
+var output = path.join(process.cwd(), 'out_files');
 
 const app = new Koa();
 const moment = require('moment');
@@ -49,14 +51,14 @@ wechatIo.on('connection', function (socket) {
 
         let cot = newData.content;
         /*
-        fs.writeFile(`out_files\\html\\${newData.otitle}.html`, cot, function (err) {
+        fs.writeFile(path.join(output, `./${newData.otitle}.html`, cot, function (err) {
             if (err) {
                 return console.error(err);
             }
         });
         */
         cot = h2m(cot);
-        fs.writeFile(`out_files\\md\\${newData.otitle}.md`, cot, function (err) {
+        fs.writeFile(path.join(output, `./${newData.otitle}.md`), cot, function (err) {
             if (err) {
                 return console.error(err);
             }
@@ -234,11 +236,11 @@ function fetchListEnd_StartArticle() {
     console.log('最终获取文章的列表总数： ', articles.length);
     wechatIo.emit('url', {url: articles[0].content_url, index: 0, total: articles.length});
 
-    fs.writeFile('out_files\\result.json', JSON.stringify(articles, null, "\t"), function (err) {
+    fs.writeFile(path.join(output, './result.json'), JSON.stringify(articles, null, "\t"), function (err) {
         if (err) {
             return console.error(err); 
         }
-        console.log("数据写入成功!", process.cwd() + '\\result.json'); 
+        console.log("数据写入成功!", output); 
     });
 }
 
