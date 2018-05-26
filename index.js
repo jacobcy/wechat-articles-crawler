@@ -19,7 +19,7 @@ proxyServer.on('ready', () => {
     console.log('-------------------------- start --------------------------------');
 });
 proxyServer.on('error', (e) => {
-
+    console.error(e);
 });
 proxyServer.start();
 

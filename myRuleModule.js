@@ -290,7 +290,7 @@ module.exports = {
 
 /**
  */
-function fetchListEndStartArticle() {
+function fetchListEnd_StartArticle() {
   console.log('最终获取文章的列表总数： ', articles.length);
   wechatIo.emit('url', {
     url: articles[0].content_url,

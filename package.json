@@ -13,14 +13,12 @@
     "eslint": "^4.19.1",
     "h2m": "^0.6.0",
     "ip": "^1.1.5",
-    "jshint": "^2.9.5",
     "koa": "^2.4.1",
     "koa-router": "^7.3.0",
     "koa2-cors": "^2.0.5",
-    "openurl": "^1.1.1",
+    "qiniu": "^7.1.7",
+    "request": "^2.87.0",
     "socket.io": "^2.0.4"
   },
-  "devDependencies": {
-    "eslint-config-google": "^0.9.1"
-  }
+  "devDependencies": {}
 }
