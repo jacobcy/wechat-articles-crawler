@@ -1,6 +1,7 @@
 module.exports = {
-    "extends": "google",
-    "parserOptions": {
-        "ecmaVersion": 8
-      }
+    "extends": "standard",
+    "rules": {
+        "eslint-env": "es6",
+        "valid-jsdoc": "error",
+    },
 };
