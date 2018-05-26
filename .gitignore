@@ -3,3 +3,4 @@
 /out_files
 .vscode
 config.js
+.DS_Store

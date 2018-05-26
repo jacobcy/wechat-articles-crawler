@@ -1,15 +1,22 @@
 const ip = require('ip').address();
-import {
-  uploadImage,
-  saveImage
-} from('qiniuImage.js');
+const saveImage = ('saveImage.js');
 
 const fs = require('fs');
 const path = require('path');
-const output = path.join(__dirname, 'out_files');
-if (!fs.accessSync(output)) {
-  fs.mkdirSync(output);
+
+function getSub(output, dir){
+  target = path.join(output, dir)
+  try {
+    fs.accessSync(target);
+  } catch (e) {
+    fs.mkdirSync(target);
+  }
+  return target;
 }
+
+const output = getSub(__dirname, 'out_files');
+const outputMD = getSub(output, 'MD');
+const outputImage = getSub(output, 'Image');
 
 const Koa = require('koa');
 const app = new Koa();
@@ -64,12 +71,17 @@ wechatIo.on('connection', (socket) => {
       if (!res) {
         break;
       }
-      let resUrl = saveImage(res[1]);
-      content.replace(res[0], `<img src="${resUrl}?imageView2/2/w/${res[2]}">`)
+      saveImage(res[1], outputImage, function (err, result) {
+        if (err) {
+          console.log(err);
+          continue;
+        }
+        content.replace(res[0], `<img src="${result}?imageView2/2/w/${res[2]}">`)
+      });
     }
 
     content = require('h2m')(content);
-    fs.writeFile(path.join(output, `${newData.otitle}.md`), content,
+    fs.writeFile(path.join(outputMD, `${newData.otitle}.md`), content,
       function (err) {
         if (err) {
           return console.error(err);

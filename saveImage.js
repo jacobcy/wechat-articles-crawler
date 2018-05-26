@@ -1,7 +1,6 @@
 var qiniu = require('qiniu');
 var request = require('request');
 var fs = require('fs');
-var mkdirp = require('mkdirp');
 var path = require('path');
 
 var getEtag = require('./qetag.js');
@@ -13,6 +12,9 @@ import {
   QINIU_BUCKET,
 } from 'config.js'
 
+qiniu.conf.ACCESS_KEY = accessKey;
+qiniu.conf.SECRET_KEY = secretKey;
+
 const IMAGE_PROCESS_SERVER_URL = 'http://' + QINIU_BUCKET + '.qiniudn.com/';
 
 /**
@@ -20,22 +22,57 @@ const IMAGE_PROCESS_SERVER_URL = 'http://' + QINIU_BUCKET + '.qiniudn.com/';
  * @param url 待存储图片的地址
  * @return 成功返回 {url: 七牛云地址}, 失败返回 {error: 错误信息}
  */
-var saveImage = function (url) {
+var saveImage = function (url, dir, cb) {
   if (!url) {
-    return {
-      error: 'URL不能为空'
-    }
+    cb('URL不能为空');
+    return;
   }
-  CloudImage.addByUrl(url, null, function (err, res) {
+  getImageContent(url, function (err, content, mimeType) {
     if (err) {
-      return {
-        error: err
-      }
+      console.error('Failed to get CloudImage data: ' + err);
+      // 如果无法获取图片内容，直接删除
+      cb('图片URL无法被访问')
+      return;
     }
-    return {
-      result: res
-    };
+    if (!content || content.length === 0) {
+      console.error('Failed to get image [' + url + '] with zero length');
+      cb('图片URL返回空数据');
+      return;
+    }
+    saveCloudImage(dir, content, mimeType, function (err, res) {
+      if (err) {
+        console.warn('Failed to save qiniu image: ' + err);
+        cb('图片云存储失败');
+        return;
+      }
+      cb(null, res.url);
+    });
   })
+}
+
+function getImageContent(url, cb) {
+  // 从URL读取图片
+  request({
+    url: url,
+    encoding: null
+  }, function (err, r, body) {
+    if (err) {
+      cb(err);
+      return;
+    }
+    mimeType = r.headers['content-type'];
+    if (!mimeType || mimeType.indexOf('image/') !== 0) {
+      cb('Invalid image with content type of ' + mimeType);
+      return;
+    }
+    // TODO: 大图需要压缩成小图片
+    // 图片大小限制(单位M)
+    if (body.length > UPLOAD_LIMIT_IN_MBYTES * 1024 * 1024) {
+      cb('图片应小于' + UPLOAD_LIMIT_IN_MBYTES + 'M');
+      return;
+    }
+    cb(null, body, mimeType);
+  });
 }
 
 /*
@@ -50,20 +87,20 @@ var saveImage = function (url) {
  * 本地文件备份到backup目录，文件名是图片hash值
  * 七牛SDK 参考 http://developer.qiniu.com/docs/v6/sdk/nodejs-sdk.html
  */
-var saveCloudImage = function (backupName, content, mimeType, cb) {
+var saveCloudImage = function (dir, content, mimeType, cb) {
   var putPolicy = new qiniu.rs.PutPolicy(QINIU_BUCKET);
   var uptoken = putPolicy.token();
   var extra = new qiniu.io.PutExtra();
   extra.mimeType = mimeType;
   // 计算文件七牛hash值，避免上传重复文件
   getEtag(content, function (name) {
+    let backupName = path.join(dir, name + '.jpg');
     // 上传文件前在本地备份文件
-    createLocalImage(backupName, content, function (err) {
+    fs.writeFile(backupName, content, function (err) {
       if (err) {
         cb(err);
         return;
       }
-
       // 上传七牛文件
       qiniu.io.put(uptoken, name, content, extra, function (err, ret) {
         if (err) {
@@ -73,7 +110,6 @@ var saveCloudImage = function (backupName, content, mimeType, cb) {
           // http://developer.qiniu.com/docs/v6/api/reference/codes.html
           return;
         }
-
         // 检查是否是空图片
         if (ret.hash === 'FvbveVFTw8z_r0XVlOPtD-MyXftg') {
           console.error('[saveCloudImage] Invalid image with zero length generated!');
@@ -95,78 +131,4 @@ var saveCloudImage = function (backupName, content, mimeType, cb) {
   });
 }
 
-/*
- * 创建本地图片备份，如果图片已经存在直接覆盖。
- * @param {String} filePath
- */
-var createLocalImage = function (filePath, content, cb) {
-  mkdirp(path.dirname(filePath), function (err) {
-    if (err) {
-      cb(err);
-      return;
-    }
-    if (fs.exists(filePath)) {
-      cb(null);
-      return;
-    }
-    fs.writeFile(filePath, content, cb);
-  })
-}
-
-function getImageContent(record, cb) {
-  // 从本地文件读取图片
-  if (record.localPath) {
-    fs.readFile(record.localPath, function (err, data) {
-      if (err) {
-        cb(err);
-        return;
-      }
-      cb(null, data);
-    });
-    return;
-  }
-
-  // 从URL读取图片
-  request({
-    url: record.sourceUrl,
-    encoding: null
-  }, function (err, r, body) {
-    if (err) {
-      cb('[getImageContent] Failed to get image ' + record.sourceUrl + ' with error: ' + err);
-      return;
-    }
-    record.mimeType = r.headers['content-type'];
-    if (!record.mimeType || record.mimeType.indexOf('image/') !== 0) {
-      cb('[getImageContent] Invalid image with content type of ' + record.mimeType);
-      return;
-    }
-    // TODO: 大图需要压缩成小图片
-    // 图片大小限制(单位M)
-    if (body.length > UPLOAD_LIMIT_IN_MBYTES * 1024 * 1024) {
-      cb('图片应小于' + UPLOAD_LIMIT_IN_MBYTES + 'M');
-      return;
-    }
-    cb(null, body);
-  });
-}
-
-// 定时上传图片到七牛云
-setInterval(function () {
-  if (typeof CloudImage === 'undefined') {
-    return;
-  }
-  if (saving) {
-    return;
-  }
-  saving = true;
-  uploadOnePhoto();
-}, 500);
-
-function getBackupPath(base, id) {
-  return './backup/' + base + '/' + Math.floor(id / 1000) + '/' + id + '.jpg';
-}
-
-export {
-  uploadImage,
-  saveImage
-};
+module.exports = saveImage;
