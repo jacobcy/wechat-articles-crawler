@@ -1,25 +1,22 @@
-var qiniu = require('qiniu');
-var request = require('request');
-var fs = require('fs');
-var path = require('path');
+const qiniu = require('qiniu');
+const request = require('request');
+const fs = require('fs');
+const path = require('path');
 
-var getEtag = require('./qetag.js');
+const getEtag = require('./qetag');
+const config = require('./config');
 
-import {
-  accessKey,
-  secretKey,
-  UPLOAD_LIMIT_IN_MBYTES,
-  QINIU_BUCKET,
-} from 'config.js'
-
-qiniu.conf.ACCESS_KEY = accessKey;
-qiniu.conf.SECRET_KEY = secretKey;
+qiniu.conf.ACCESS_KEY = config.accessKey;
+qiniu.conf.SECRET_KEY = config.secretKey;
+const UPLOAD_LIMIT_IN_MBYTES = config.UPLOAD_LIMIT_IN_MBYTES;
+const QINIU_BUCKET = config.QINIU_BUCKET;
 
 const IMAGE_PROCESS_SERVER_URL = 'http://' + QINIU_BUCKET + '.qiniudn.com/';
 
 /**
  * 转存网络图片到七牛服务器接口
  * @param url 待存储图片的地址
+ * @param dir 带存储图片的本地路径
  * @return 成功返回 {url: 七牛云地址}, 失败返回 {error: 错误信息}
  */
 var saveImage = function (url, dir, cb) {
@@ -31,7 +28,7 @@ var saveImage = function (url, dir, cb) {
     if (err) {
       console.error('Failed to get CloudImage data: ' + err);
       // 如果无法获取图片内容，直接删除
-      cb('图片URL无法被访问')
+      cb('图片URL无法被访问');
       return;
     }
     if (!content || content.length === 0) {
@@ -47,20 +44,20 @@ var saveImage = function (url, dir, cb) {
       }
       cb(null, res.url);
     });
-  })
-}
+  });
+};
 
 function getImageContent(url, cb) {
   // 从URL读取图片
   request({
     url: url,
-    encoding: null
+    encoding: null,
   }, function (err, r, body) {
     if (err) {
       cb(err);
       return;
     }
-    mimeType = r.headers['content-type'];
+    let mimeType = r.headers['content-type'];
     if (!mimeType || mimeType.indexOf('image/') !== 0) {
       cb('Invalid image with content type of ' + mimeType);
       return;
@@ -116,7 +113,7 @@ var saveCloudImage = function (dir, content, mimeType, cb) {
           cb('zero length image');
           return;
         }
-        if (ret.hash != name) {
+        if (ret.hash !== name) {
           console.error('Qiniu file hash not match. ' + name + ' != ' + ret.hash);
           cb('hash not match');
           return;
@@ -124,11 +121,11 @@ var saveCloudImage = function (dir, content, mimeType, cb) {
         // 上传成功
         cb(null, {
           hash: ret.hash,
-          url: ret.key
+          url: ret.key,
         });
       });
     });
   });
-}
+};
 
 module.exports = saveImage;

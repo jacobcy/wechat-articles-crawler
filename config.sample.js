@@ -1,12 +1,6 @@
-const accessKey = "";
-const secretKey = "";
-
-const UPLOAD_LIMIT_IN_MBYTES = "";
-const NIU_BUCKET = "";
-
-export {
-  accessKey,
-  secretKey,
-  UPLOAD_LIMIT_IN_MBYTES,
-  QINIU_BUCKET,
+module.exports = {
+  accessKey: '',
+  secretKey: '',
+  UPLOAD_LIMIT_IN_MBYTES: 5,
+  QINIU_BUCKET: '',
 };
