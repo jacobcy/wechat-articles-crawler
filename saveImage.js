@@ -10,7 +10,7 @@ const MAC = new qiniu.auth.digest.Mac(config.accessKey, config.secretKey);
 const UPLOAD_LIMIT_IN_MBYTES = config.UPLOAD_LIMIT_IN_MBYTES;
 const QINIU_BUCKET = config.QINIU_BUCKET;
 
-const SERVER = 'http://' + QINIU_BUCKET + '.qiniudn.com/';
+const SERVER = 'http://public.iwangpo.com/';
 
 /**
  * 转存网络图片到七牛服务器接口

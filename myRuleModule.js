@@ -71,16 +71,28 @@ wechatIo.on('connection', (socket) => {
     let content = newData.content;
 
     // simplify the img lable in the body
-    let imgReg = /<img[\s\S]*?data-src="(.*?)"[\s\S]*?width:\s*(\d+)[\s\S]*?>/g;
+    let imgReg = /<img[\s\S]*?data-src="([\s\S]*?)"[\s\S]*?width:\s*(\w+)[\s\S]*?>/g;
+
+      // 找出未匹配的图片
+      for (let i of content.match(/<img[\s\S]*?>/g)) {
+        if (!imgReg.test(i)) {
+          console.log('该图片没有成功匹配：', i);
+        }
+      }
+
     let res;
+    let j = 1;
     while ((res = imgReg.exec(content)) !== null) {
       try {
         let result = await saveImage(res[1], outputImage);
+        console.log(`这是文章中的第 ${j} 张图片`);
+        console.log('图片地址为：', result);
         console.log('图片宽度为：', res[2]);
-        content = content.replace(res[0], `<img src="${result}?imageView2/2/w/${res[2]}">`);
+        j++;
+        content = content.replace(res[0], `<img src="${result}?imageView2/2/w/600">`);
       } catch (e) {
         console.log(e);
-        content= content.replace(res[0], `<img src="${res[1]}?imageView2/2/w/${res[2]}">`);
+        content = content.replace(res[0], `<img src="${res[1]}?imageView2/2/w/600">`);
       }
     }
     // 文章页内容从html格式转为markdown格式
@@ -113,7 +125,7 @@ wechatIo.on('connection', (socket) => {
   });
 
   socket.on('noData', () => {
-    if (!articles[index].content_url){
+    if (!articles[index].content_url) {
       socket.emit('end', {});
     }
     console.warn(' 超时没有爬取到？ url: ', articles[index].content_url);
