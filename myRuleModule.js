@@ -75,7 +75,7 @@ wechatIo.on('connection', (socket) => {
         if (err) {
           console.log(err);
         } else {
-          content.replace(res[0], `<img src="${result}?imageView2/2/w/${res[2]}">`);
+          content = content.replace(res[0], `<img src="${result}?imageView2/2/w/${res[2]}">`);
         }
       });
     }
@@ -142,7 +142,7 @@ let injectJs = `<script id="injectJs" type="text/javascript">
 let articleInjectJs = `<script id="injectJs" type="text/javascript">
     ${articleInjectJsFile}</script>`;
 const fakeImg = fs.readFileSync('fake.png');
-const maxLength = 30;
+const maxLength = 1;
 
 module.exports = {
   summary: 'wechat articles crawler',
@@ -168,7 +168,7 @@ module.exports = {
     // 历史文章列表
     if (requestDetail.url.indexOf('mp.weixin.qq.com/mp/profile_ext?') !== -1 &&
       requestDetail.requestOptions.method === 'GET') {
-      console.log('get  profile_ext',
+      console.log('get profile_ext',
         responseDetail.response.header['Content-Type']);
 
       const newResponse = responseDetail.response;
@@ -178,10 +178,11 @@ module.exports = {
 
       if (responseDetail.response.header['Content-Type']
         .indexOf('text/html') !== -1) {
-        let msgReg = /var msgList = '(.*?)'/;
+        let msgReg = /var msgList = '(.*?)';/;
 
         let execBody = msgReg.exec(body)[1];
-        let msgList = JSON.parse(execBody.replace(/&quot/g, '"'));
+        let execRes = execBody.replace(/&quot;/g, '"');
+        let msgList = JSON.parse(execRes);
         // JSON.parse(msgReg.exec(body)[1])
 
         msgList.list.forEach((v, i) => {
@@ -241,9 +242,7 @@ module.exports = {
       }
 
       newAdd.forEach((v) => {
-        v.content_url = v.content_url.replace(/amp/g, '')
-          .replace(/\\\//g, '/')
-          .replace('#wechat_redirect', '');
+        v.content_url = v.content_url.replace(/amp;/g, '').replace(/\\\//g, '/').replace('#wechat_redirect', '');
       });
 
       if (articles.length <= maxLength) {
@@ -259,6 +258,7 @@ module.exports = {
         response: newResponse,
       };
     } else if (
+
       requestDetail.url.indexOf('mp.weixin.qq.com/mp/getappmsgext?') !== -1 &&
       requestDetail.requestOptions.method === 'POST') {
       // 获取评论数，点赞数
