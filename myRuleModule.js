@@ -53,58 +53,69 @@ let wechatIo = io.of('/wechat');
 let resultIo = io.of('/result');
 
 wechatIo.on('connection', (socket) => {
-  socket.on('crawler', (crawData) => {
+  socket.on('crawler', async (crawData) => {
     crawData.crawTime = require('moment')().format('YYYY-MM-DD HH:mm');
-
-    let newData = Object.assign({
-      otitle: articles[index].title,
-      ourl: articles[index].content_url,
-      author: articles[index].author,
-    }, crawData);
-
+    let newData;
+    if (articles[index]) {
+      newData = Object.assign({
+        otitle: articles[index].title,
+        ourl: articles[index].content_url,
+        author: articles[index].author,
+      }, crawData);
+    } else {
+      newData = Object.assign({
+        otitle: '这是一篇测试文章',
+      }, crawData);
+    }
+    // 获取html格式文章页内容
     let content = newData.content;
 
     // simplify the img lable in the body
-    let imgReg = /<img[\s\S]*?data-src="(.*?)"[\s\S]*?width:\s*(\w+)[\s\S]*?>/g;
-    while (true) {
-      let res = imgReg.exec(content);
-      if (!res) {
-        break;
+    let imgReg = /<img[\s\S]*?data-src="(.*?)"[\s\S]*?width:\s*(\d+)[\s\S]*?>/g;
+    let res;
+    while ((res = imgReg.exec(content)) !== null) {
+      try {
+        let result = await saveImage(res[1], outputImage);
+        console.log('图片宽度为：', res[2]);
+        content = content.replace(res[0], `<img src="${result}?imageView2/2/w/${res[2]}">`);
+      } catch (e) {
+        console.log(e);
+        content= content.replace(res[0], `<img src="${res[1]}?imageView2/2/w/${res[2]}">`);
       }
-      saveImage(res[1], outputImage, function (err, result) {
-        if (err) {
-          console.log(err);
-        } else {
-          content = content.replace(res[0], `<img src="${result}?imageView2/2/w/${res[2]}">`);
-        }
-      });
     }
-
+    // 文章页内容从html格式转为markdown格式
     content = require('h2m')(content);
+    // 文章页内容本地保存
+    console.log('开始保存页面');
     fs.writeFile(path.join(outputMD, `${newData.otitle}.md`), content,
       function (err) {
         if (err) {
-          return console.error(err);
+          console.error('fail for:', newData.otitle);
+          console.error(err);
+        } else {
+          console.log('success for:', newData.otitle);
+          socket.emit('success');
+          resultIo.emit('newData', newData);
         }
-        console.log('success for:', newData.otitle);
-      });
 
-    socket.emit('success');
-    resultIo.emit('newData', newData);
-    index++;
-
-    if (articles[index]) {
-      socket.emit('url', {
-        url: articles[index].content_url,
-        index: index,
-        total: articles.length,
+        index++;
+        // 检查是否有待抓取的文章
+        if (articles[index]) {
+          socket.emit('url', {
+            url: articles[index].content_url,
+            index: index,
+            total: articles.length,
+          });
+        } else {
+          socket.emit('end', {});
+        }
       });
-    } else {
-      socket.emit('end', {});
-    }
   });
 
-  socket.on('noData', (crawData) => {
+  socket.on('noData', () => {
+    if (!articles[index].content_url){
+      socket.emit('end', {});
+    }
     console.warn(' 超时没有爬取到？ url: ', articles[index].content_url);
     index++;
 
