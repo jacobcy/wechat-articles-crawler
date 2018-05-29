@@ -1,22 +1,6 @@
 const ip = require('ip').address();
-const saveImage = require('./saveImage');
-
 const fs = require('fs');
-const path = require('path');
-
-function getSub(output, dir) {
-  let target = path.join(output, dir);
-  try {
-    fs.accessSync(target);
-  } catch (e) {
-    fs.mkdirSync(target);
-  }
-  return target;
-}
-
-const output = getSub(__dirname, 'out_files');
-const outputMD = getSub(output, 'MD');
-const outputImage = getSub(output, 'Image');
+const convert = require('./convert');
 
 const Koa = require('koa');
 const app = new Koa();
@@ -49,84 +33,59 @@ server.listen(9000);
 
 let articles = [];
 let index = 0;
+let str;
 let wechatIo = io.of('/wechat');
 let resultIo = io.of('/result');
 
 wechatIo.on('connection', (socket) => {
-  socket.on('crawler', async (crawData) => {
+  socket.on('crawler', (crawData) => {
     crawData.crawTime = require('moment')().format('YYYY-MM-DD HH:mm');
+
     let newData;
+
+    if (!articles[index]) {
+      articles[index] = {
+        title: '这是一篇测试文章',
+        content_url: 'https://wx.qq.com/',
+        author: '不明',
+      };
+    };
+    articles[index].content = crawData.content;
+    //str = JSON.stringify(articles[index].content);
+    //console.log(str.substr(str.length - 1000, 1000));
+
+    newData = Object.assign({
+      otitle: articles[index].title,
+      ourl: articles[index].content_url,
+      author: articles[index].author,
+    }, crawData);
+    //console.log('打开待抓取的文章:', newData.otitle);
+
+    resultIo.emit('newData', newData);
+    socket.emit('success');
+    index++;
+
+    // 检查是否有待抓取的文章
     if (articles[index]) {
-      newData = Object.assign({
-        otitle: articles[index].title,
-        ourl: articles[index].content_url,
-        author: articles[index].author,
-      }, crawData);
-    } else {
-      newData = Object.assign({
-        otitle: '这是一篇测试文章',
-      }, crawData);
-    }
-    // 获取html格式文章页内容
-    let content = newData.content;
-
-    // simplify the img lable in the body
-    let imgReg = /<img[\s\S]*?data-src="([\s\S]*?)"[\s\S]*?width:\s*(\w+)[\s\S]*?>/g;
-
-      // 找出未匹配的图片
-      for (let i of content.match(/<img[\s\S]*?>/g)) {
-        if (!imgReg.test(i)) {
-          console.log('该图片没有成功匹配：', i);
-        }
-      }
-
-    let res;
-    let j = 1;
-    while ((res = imgReg.exec(content)) !== null) {
-      try {
-        let result = await saveImage(res[1], outputImage);
-        console.log(`这是文章中的第 ${j} 张图片`);
-        console.log('图片地址为：', result);
-        console.log('图片宽度为：', res[2]);
-        j++;
-        content = content.replace(res[0], `<img src="${result}?imageView2/2/w/600">`);
-      } catch (e) {
-        console.log(e);
-        content = content.replace(res[0], `<img src="${res[1]}?imageView2/2/w/600">`);
-      }
-    }
-    // 文章页内容从html格式转为markdown格式
-    content = require('h2m')(content);
-    // 文章页内容本地保存
-    console.log('开始保存页面');
-    fs.writeFile(path.join(outputMD, `${newData.otitle}.md`), content,
-      function (err) {
-        if (err) {
-          console.error('fail for:', newData.otitle);
-          console.error(err);
-        } else {
-          console.log('success for:', newData.otitle);
-          socket.emit('success');
-          resultIo.emit('newData', newData);
-        }
-
-        index++;
-        // 检查是否有待抓取的文章
-        if (articles[index]) {
-          socket.emit('url', {
-            url: articles[index].content_url,
-            index: index,
-            total: articles.length,
-          });
-        } else {
-          socket.emit('end', {});
-        }
+      socket.emit('url', {
+        url: articles[index].content_url,
+        index: index,
+        total: articles.length,
       });
+    } else {
+      socket.emit('end', {});
+      console.log('开始对数据进行转换');
+      //str = JSON.stringify(articles);
+      //console.log(str.substr(str.length - 1000, 1000));
+      convert(articles);
+    }
   });
 
-  socket.on('noData', () => {
-    if (!articles[index].content_url) {
+  socket.on('noData', (e) => {
+    if (!articles[index]) {
       socket.emit('end', {});
+      console.log('当前页面没有有效数据:', JSON.stringify(e));
+      return;
     }
     console.warn(' 超时没有爬取到？ url: ', articles[index].content_url);
     index++;
@@ -139,6 +98,8 @@ wechatIo.on('connection', (socket) => {
       });
     } else {
       socket.emit('end', {});
+      console.log('开始对数据进行转换');
+      convert(articles);
     }
   });
 });
@@ -165,7 +126,7 @@ let injectJs = `<script id="injectJs" type="text/javascript">
 let articleInjectJs = `<script id="injectJs" type="text/javascript">
     ${articleInjectJsFile}</script>`;
 const fakeImg = fs.readFileSync('fake.png');
-const maxLength = 1;
+const maxLength = 1000;
 
 module.exports = {
   summary: 'wechat articles crawler',
@@ -320,13 +281,4 @@ function fetchListEndStartArticle() {
     index: 0,
     total: articles.length,
   });
-
-  fs.writeFile(path.join(output, 'result.json'),
-    JSON.stringify(articles, null, '\t'),
-    function (err) {
-      if (err) {
-        return console.error(err);
-      }
-      console.log('数据写入成功!', output);
-    });
 };

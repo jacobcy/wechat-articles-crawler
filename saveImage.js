@@ -1,24 +1,30 @@
-const qiniu = require('qiniu');
-const request = require('request');
 const fs = require('fs');
 const path = require('path');
+const request = require('request');
 
-const getEtag = require('./qetag');
+const qiniu = require('qiniu');
 const config = require('./config');
-
+const getEtag = require('./qetag');
 const MAC = new qiniu.auth.digest.Mac(config.accessKey, config.secretKey);
+const configure = new qiniu.conf.Config();
+// 空间对应的机房
+//configure.zone = qiniu.zone.Zone_z1;
+var formUploader = new qiniu.form_up.FormUploader(configure);
+var putExtra = new qiniu.form_up.PutExtra();
+
 const UPLOAD_LIMIT_IN_MBYTES = config.UPLOAD_LIMIT_IN_MBYTES;
 const QINIU_BUCKET = config.QINIU_BUCKET;
+const SERVER = config.SERVER;
 
-const SERVER = 'http://public.iwangpo.com/';
+module.exports = saveImage;
 
 /**
  * 转存网络图片到七牛服务器接口
  * @param url 待存储图片的地址
- * @param dir 带存储图片的本地路径
+ * @param dir 待存储图片的本地路径
  * @return 成功返回 {url: 七牛云地址}, 失败返回 {error: 错误信息}
  */
-var saveImage = function (url, dir) {
+function saveImage(url, dir) {
   return new Promise((resolve, reject) => {
     if (!url) {
       reject(new Error('URL不能为空'));
@@ -38,7 +44,9 @@ var saveImage = function (url, dir) {
           console.warn('Failed to save qiniu image: ' + err);
           reject(new Error('图片云存储失败'));
         } else {
-          resolve(SERVER + res.key);
+          let target = SERVER + res.key;
+          //console.log('图片数据被保存为：', target);
+          resolve(target);
         }
       });
     });
@@ -52,15 +60,14 @@ function getImageContent(url, cb) {
     encoding: null,
   }, function (err, r, body) {
     if (err) {
-      cb(err);
-      return;
+      return cb(err);
     }
     // TODO: 大图需要压缩成小图片
     // 图片大小限制(单位M)
     if (body.length > UPLOAD_LIMIT_IN_MBYTES * 1024 * 1024) {
-      cb('图片应小于' + UPLOAD_LIMIT_IN_MBYTES + 'M');
-      return;
+      return cb('图片应小于' + UPLOAD_LIMIT_IN_MBYTES + 'M');
     }
+    //console.log('从以下地址获得图片：', url);
     cb(null, body);
   });
 }
@@ -82,19 +89,14 @@ var saveCloudImage = function (dir, content, cb) {
     let options = {
       scope: QINIU_BUCKET + ':' + key,
     };
-    var putPolicy = new qiniu.rs.PutPolicy(options);
-    var uploadToken = putPolicy.uploadToken(MAC);
+    let putPolicy = new qiniu.rs.PutPolicy(options);
+    let uploadToken = putPolicy.uploadToken(MAC);
     let localFile = path.join(dir, key);
     // 上传文件前在本地备份文件
     fs.writeFile(localFile, content, function (err) {
       if (err) {
         return cb(err);
       }
-      var config = new qiniu.conf.Config();
-      // 空间对应的机房
-      //config.zone = qiniu.zone.Zone_z1;
-      var formUploader = new qiniu.form_up.FormUploader(config);
-      var putExtra = new qiniu.form_up.PutExtra();
       formUploader.putFile(uploadToken, key, localFile, putExtra, function (err,
         respBody, respInfo) {
         if (err) {
@@ -105,14 +107,13 @@ var saveCloudImage = function (dir, content, cb) {
         }
         // 上传成功
         if (respInfo.statusCode === 200) {
+          //console.log('图片上传成功');
           return cb(null, respBody);
         }
         //console.log(err, respBody, respInfo);
         console.error('图片上传状态', respInfo.statusCode);
-        return cb(respBody.error);
+        cb(respBody.error);
       });
     });
   });
 };
-
-module.exports = saveImage;
