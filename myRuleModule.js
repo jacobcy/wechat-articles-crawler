@@ -50,7 +50,16 @@ wechatIo.on('connection', (socket) => {
         author: '不明',
       };
     };
+
+    articles[index] = Object.assign({
+      crawTime: crawData.crawTime,
+      likeNum: crawData.likeNum,
+      postDate: crawData.postDate,
+      postUser: crawData.postUser,
+      readNum: crawData.readNum,
+    }, articles[index]);
     articles[index].content = crawData.content;
+
     //str = JSON.stringify(articles[index].content);
     //console.log(str.substr(str.length - 1000, 1000));
 
@@ -227,12 +236,17 @@ module.exports = {
 
       newAdd.forEach((v) => {
         v.content_url = v.content_url.replace(/amp;/g, '').replace(/\\\//g, '/').replace('#wechat_redirect', '');
+        v.source_url = v.source_url.replace(/amp;/g, '').replace(/\\\//g, '/').replace(/https.*?redirect_uri=/g, '');
+        v.cover = v.cover.replace(/amp;/g, '').replace(/\\\//g, '/').replace(/\?wx_fmt=\w+/g, '');
+        v.content = v.content.replace(/[\r\n]/g, '').replace(/amp;/g, '').replace(/&tp=\w+&wxfrom=\d+&wx_lazy=\d+/g, '').replace(/\?wx_fmt=\w+/g, '').replace(/&nbsp;/g, ' ');
+        v.title = v.title.replace(/amp;/g, '').replace(/&nbsp;/g, ' ');
+        v.digest = v.digest.replace(/amp;/g, '').replace(/&nbsp;/g, ' ');
       });
 
       if (articles.length <= maxLength) {
         articles = articles.concat(newAdd);
       }
-      console.log('获取文章的列表总数articles.length ', articles.length);
+      console.log('获取文章的列表总数: ', articles.length);
 
       if (!canMsgContinue || articles.length > maxLength) {
         fetchListEndStartArticle();
