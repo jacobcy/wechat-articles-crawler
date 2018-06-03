@@ -19,7 +19,7 @@ const outputHtml = getSub(output, 'html');
 const outputImage = getSub(output, 'Image');
 
 function formatDate(ns) {
-  var d = new Date(ns * 1000);
+  var d = new Date(parseInt(ns) * 1000);
   var dformat = [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-') +
     ' ' + [d.getHours(), d.getMinutes(), d.getSeconds()].join(':');
   return dformat;
@@ -99,12 +99,14 @@ async function convert(articles) {
     article.keywords = [];
     let keywords = await jieba.extract(article.content, 20);
     let tagBlackList = ['学生', '学者', '老师', '名校', '大学', '文章', '一个', '一位', '一块', '少年', '小孩', '能够'];
+    let attrAllow = ['n', 'v'];
     for (let k of keywords) {
       let word = k.word;
+      let attr = jieba.tag(word)['tag'];
       if (article.author.indexOf(word)) {
         continue;
       }
-      if (/[a-zA-Z0-9]/.test(word)) {
+      if (attrAllow.indexOf(attr) === -1) {
         continue;
       }
       if (tagBlackList.indexOf(word) === -1) {
@@ -118,9 +120,7 @@ async function convert(articles) {
 ---
 title: ${article.title}
 subtitle: ${article.digest}
-author: 
-  nick: ${article.author || '中华好学者'}
-  link: ${domain + article.author}
+author: ${article.author || '中华好学者'}
 editor: 
   name: ${article.postUser || article.author || '中华好学者'}
   link: ${article.content_url}
