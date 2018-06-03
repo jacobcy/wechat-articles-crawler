@@ -7,6 +7,7 @@ const app = new Koa();
 const server = require('http').createServer(app.callback());
 const io = require('socket.io')(server);
 
+const maxLength = 10;
 const Router = require('koa-router');
 const router = new Router();
 
@@ -135,7 +136,6 @@ let injectJs = `<script id="injectJs" type="text/javascript">
 let articleInjectJs = `<script id="injectJs" type="text/javascript">
     ${articleInjectJsFile}</script>`;
 const fakeImg = fs.readFileSync('fake.png');
-const maxLength = 1000;
 
 module.exports = {
   summary: 'wechat articles crawler',
@@ -238,9 +238,9 @@ module.exports = {
         v.content_url = v.content_url.replace(/amp;/g, '').replace(/\\\//g, '/').replace('#wechat_redirect', '');
         v.source_url = v.source_url.replace(/amp;/g, '').replace(/\\\//g, '/').replace(/https.*?redirect_uri=/g, '');
         v.cover = v.cover.replace(/amp;/g, '').replace(/\\\//g, '/').replace(/\?wx_fmt=\w+/g, '');
-        v.content = v.content.replace(/[\r\n]/g, '').replace(/amp;/g, '').replace(/&tp=\w+&wxfrom=\d+&wx_lazy=\d+/g, '').replace(/\?wx_fmt=\w+/g, '').replace(/&nbsp;/g, ' ');
-        v.title = v.title.replace(/amp;/g, '').replace(/&nbsp;/g, ' ');
-        v.digest = v.digest.replace(/amp;/g, '').replace(/&nbsp;/g, ' ');
+        v.content = v.content.replace(/[\r\n]/g, '').replace(/amp;/g, '').replace(/&tp=\w+&wxfrom=\d+&wx_lazy=\d+/g, '').replace(/\?wx_fmt=\w+/g, '').replace(/&nbsp;/g, '').replace(/<mpcpc.*?\/mpcpc>/g, '');
+        v.title = v.title.replace(/amp;/g, '').replace(/&nbsp;/g, '');
+        v.digest = v.digest.replace(/amp;/g, '').replace(/&nbsp;/g, '');
       });
 
       if (articles.length <= maxLength) {

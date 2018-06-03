@@ -1,5 +1,5 @@
 var serverUrl = 'http://{$IP}:9000';
-var socket = io(serverUrl+'/wechat').connect(serverUrl);
+var socket = io(serverUrl + '/wechat').connect(serverUrl);
 
 socket.on('success', function () {
     var localIndex = window.localStorage.localIndex;
@@ -33,7 +33,6 @@ socket.on('connect', function () {
         var activityName = $('#activity-name').text().trim();
         var js_share_source = $('#js_share_source').attr('href');
 
-
         socket.emit('crawler', {
             readNum: readNum,
             likeNum: likeNum,
@@ -43,7 +42,7 @@ socket.on('connect', function () {
             js_share_source: js_share_source,
             content: content
         });
-    }, 1000);
+    }, 2000);
 
     timeoutKey = setTimeout(function () {
 
@@ -55,5 +54,5 @@ socket.on('connect', function () {
         clearInterval(key);
         $('#js_content').html("<label style='font-size: 30px;color:red'>没有阅读数据? " + e + "</label>");
 
-    }, 10000);
+    }, 5000);
 });

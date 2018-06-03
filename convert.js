@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const saveImage = require('./saveImage');
+const domain = 'http://bghunt.cn/author/';
+const jieba = require('nodejieba');
 
 function getSub(output, dir) {
   let target = path.join(output, dir);
@@ -13,10 +15,11 @@ function getSub(output, dir) {
 }
 const output = getSub(__dirname, 'out_files');
 const outputMD = getSub(output, 'MD');
+const outputHtml = getSub(output, 'html');
 const outputImage = getSub(output, 'Image');
 
 function formatDate(ns) {
-  var d = new Date(ns);
+  var d = new Date(ns * 1000);
   var dformat = [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-') +
     ' ' + [d.getHours(), d.getMinutes(), d.getSeconds()].join(':');
   return dformat;
@@ -31,9 +34,10 @@ async function convert(articles) {
     //首先处理封面
     if (article.cover) {
       try {
-        article.cover = await saveImage(article.cover, outputImage);
+        str = await saveImage(article.cover, outputImage);
+        article.cover = str + '?imageMogr2/crop/x500';
       } catch (e) {
-        console.error(e);
+        console.warn('文章封面图替换失败：', e);
         article.cover = '';
       }
     }
@@ -53,7 +57,7 @@ async function convert(articles) {
           console.log(`这是文章中的第 ${count} 张图片`);
           count++;
           if (!imgReg.test(item)) {
-            console.log('该图片没有成功匹配：', item);
+            console.error('该图片没有成功匹配：', item);
           }
         });
         console.log(`==================================`); */
@@ -62,34 +66,64 @@ async function convert(articles) {
     let count = 1;
     //console.log(`======开始对文中的图片进行替换======`);
     while ((res = imgReg.exec(article.content)) !== null) {
-      console.log(`替换匹配的第 ${count} 张图片，图片宽度为${res[2]}`);
       count++;
       try {
         let result = await saveImage(res[1], outputImage);
         article.content = article.content.replace(res[0], `<img src="${result}?imageView2/2/w/600">`);
-        //console.log('图片地址被替换为：', result);
+        // console.log(`第 ${count} 张图片替换成功，图片宽度为${res[2]}`);
       } catch (e) {
-        console.log('图片地址替换失败：', e);
+        console.warn(`第 ${count} 张图片替换失败：`, e);
         article.content = article.content.replace(res[0], `<img src="${res[1]}?imageView2/2/w/600">`);
       }
       //str = JSON.stringify(article.content);
-      //console.log(str.substr(str.length - 2000, 2000));
+      //console.log('-----文章结尾部分-----\n', str.substr(str.length - 2000, 2000));
     }
     console.log(`==================================`);
 
+    /*     await fs.writeFile(path.join(outputHtml, `${article.title}.html`), article.content,
+        function (err) {
+          if (err) {
+            console.error('fail for:', article.title);
+            console.error(err);
+          } else {
+            console.log('success for:', article.title);
+          }
+        }); */
+
     // 文章页内容从html格式转为markdown格式
     article.content = require('h2m')(article.content);
-    //console.log('当前文章字符数：',article.content.length);
+    //console.log('文章字符数：',article.content.length);
     //str = JSON.stringify(article.content);
-    //console.log('文章结尾部分：', str.substr(str.length - 100, 100));
+    //console.log('-----文章结尾部分-----\n', str.substr(str.length - 1000, 1000));
 
-    //str = JSON.stringify(article);
-    //console.log(article);
+    article.keywords = [];
+    let keywords = await jieba.extract(article.content, 20);
+    let tagBlackList = ['学生', '学者', '老师', '名校', '大学', '文章', '一个', '一位', '一块', '少年', '小孩', '能够'];
+    for (let k of keywords) {
+      let word = k.word;
+      if (article.author.indexOf(word)) {
+        continue;
+      }
+      if (/[a-zA-Z0-9]/.test(word)) {
+        continue;
+      }
+      if (tagBlackList.indexOf(word) === -1) {
+        article.keywords.push(word);
+      }
+    }
+    console.log(article.keywords.toString());
+
     let outputContent =
       `
 ---
 title: ${article.title}
-author: ${article.author}
+subtitle: ${article.digest}
+author: 
+  nick: ${article.author || '中华好学者'}
+  link: ${domain + article.author}
+editor: 
+  name: ${article.postUser || article.author || '中华好学者'}
+  link: ${article.content_url}
 date: ${formatDate(article.postDate)}
 crawTime: ${article.crawTime}
 cover: ${article.cover}
@@ -99,6 +133,10 @@ source_url: ${article.source_url}
 source_wechat: ${article.content_url}
 categories: 
 tags: 
+  - ${article.keywords[0]}
+  - ${article.keywords[1]}
+  - ${article.keywords[2]}
+comments: true
 ---
 ${article.digest}
 <!--more-->

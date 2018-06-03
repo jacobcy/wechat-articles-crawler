@@ -41,7 +41,7 @@ function saveImage(url, dir) {
       }
       saveCloudImage(dir, content, function (err, res) {
         if (err) {
-          console.warn('Failed to save qiniu image: ' + err);
+          console.error('Failed to save qiniu image: ' + err);
           reject(new Error('图片云存储失败'));
         } else {
           let target = SERVER + res.key;
