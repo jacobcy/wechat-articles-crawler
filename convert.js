@@ -4,6 +4,10 @@ const saveImage = require('./saveImage');
 const domain = 'http://bghunt.cn/author/';
 const jieba = require('nodejieba');
 
+let str;
+module.exports = convert;
+
+// 自动创建输出文件夹
 function getSub(output, dir) {
   let target = path.join(output, dir);
   try {
@@ -18,18 +22,55 @@ const outputMD = getSub(output, 'MD');
 const outputHtml = getSub(output, 'html');
 const outputImage = getSub(output, 'Image');
 
+// 获取文章发布的时间
 function formatDate(ns) {
   var d = new Date(parseInt(ns) * 1000);
+  //console.log(d);
   var dformat = [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-') +
     ' ' + [d.getHours(), d.getMinutes(), d.getSeconds()].join(':');
   return dformat;
 }
 
-module.exports = convert;
+// module.exports = getKewwords;
+// 获取文章的关键词，排除文章作者
+function getKewwords(author, content) {
+  let keyResult = [];
+  let keywords = jieba.extract(content, 50);
+  str = JSON.stringify(keywords);
+  // console.log(str);
+  let tagBlackList = ['中国', '东西', '中西', '共和国', '城镇', '两国', '中华', '论文', '工作'];
+  let attrAllow = ['vn', 'nr', 'nrt', 'ns', 'nt', 'nz', 'l', 'j'];
+  for (let k of keywords) {
+    let word = k.word;
+    let attr = jieba.tag(word)[0].tag;
+    // console.log('=====');
+    // console.log('关键词判断：', word, attr);
+    if (author.indexOf(word) !== -1) {
+      // console.log(word, ':可能是作者，排除!');
+      continue;
+    }
+    if (attrAllow.indexOf(attr) === -1) {
+      // console.log(word, '词性是', attr, ',排除!');
+      continue;
+    }
+    if (tagBlackList.indexOf(word) !== -1) {
+      // console.log(word, ':不在名单中，排除!');
+      continue;
+    }
+    // console.log(word, ':符合条件，通过!');
+    keyResult.push(word);
+  }
+  // console.log(keyResult.toString());
+  return keyResult;
+}
 
-let str;
-
+// 将html文章内容处理为md格式文章
 async function convert(articles) {
+  if (!articles) {
+    console.error('没有需要转换的内容，end!');
+    return;
+  }
+
   for (let article of articles) {
     //首先处理封面
     if (article.cover) {
@@ -96,52 +137,46 @@ async function convert(articles) {
     //str = JSON.stringify(article.content);
     //console.log('-----文章结尾部分-----\n', str.substr(str.length - 1000, 1000));
 
-    article.keywords = [];
-    let keywords = await jieba.extract(article.content, 20);
-    let tagBlackList = ['学生', '学者', '老师', '名校', '大学', '文章', '一个', '一位', '一块', '少年', '小孩', '能够'];
-    let attrAllow = ['n', 'v'];
-    for (let k of keywords) {
-      let word = k.word;
-      let attr = jieba.tag(word)['tag'];
-      if (article.author.indexOf(word)) {
-        continue;
-      }
-      if (attrAllow.indexOf(attr) === -1) {
-        continue;
-      }
-      if (tagBlackList.indexOf(word) === -1) {
-        article.keywords.push(word);
-      }
+    if (!article.content) {
+      console.error(`fail for: ${article.title},内容为空!`);
+      return;
     }
-    console.log(article.keywords.toString());
+
+    article.keywords = getKewwords(article.author, article.content);
+    let keywords = '';
+    for (let i = 0; i < 5; i++) {
+      if (!article.keywords[i]) {
+        break;
+      }
+      keywords = keywords +
+        `
+  - ${article.keywords[i]}`;
+    }
 
     let outputContent =
       `
 ---
 title: ${article.title}
 subtitle: ${article.digest}
-author: ${article.author || '中华好学者'}
+author: ${article.author || 'Admin'}
 editor: 
-  name: ${article.postUser || article.author || '中华好学者'}
+  name: ${article.postUser || article.author || 'Admin'}
   link: ${article.content_url}
-date: ${formatDate(article.postDate)}
+date: ${formatDate(article.datetime)}
 crawTime: ${article.crawTime}
 cover: ${article.cover}
 likeNum: ${article.likeNum}
 readNum: ${article.readNum}
 source_url: ${article.source_url}
-source_wechat: ${article.content_url}
+raw_url: ${article.content_url}
 categories: 
-tags: 
-  - ${article.keywords[0]}
-  - ${article.keywords[1]}
-  - ${article.keywords[2]}
+tags: ${keywords}
 comments: true
 ---
 ${article.digest}
 <!--more-->
 ${article.content}
-    `;
+`;
     // 文章页内容本地保存
     fs.writeFile(path.join(outputMD, `${article.title}.md`), outputContent,
       function (err) {
@@ -154,12 +189,12 @@ ${article.content}
       });
   };
 
-  fs.writeFile(path.join(output, 'result.json'),
-    JSON.stringify(articles, null, '\t'),
-    function (err) {
-      if (err) {
-        return console.error(err);
-      }
-      console.log('数据写入成功!', output);
-    });
+  let outputJson = JSON.stringify(articles, null, '\t');
+  //console.log(outputJson);
+  fs.writeFile(path.join(output, 'result.json'), outputJson, function (err) {
+    if (err) {
+      return console.error(err);
+    }
+    console.log('数据写入成功!', output);
+  });
 };

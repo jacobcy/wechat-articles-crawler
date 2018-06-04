@@ -2191,7 +2191,7 @@ node-uuid@~1.4.7:
 
 nodejieba@^2.2.6:
   version "2.2.6"
-  resolved "http://r.cnpmjs.org/nodejieba/download/nodejieba-2.2.6.tgz#17cd416705b7b01c062e6cd9d7179b30453eb4a3"
+  resolved "http://registry.npm.taobao.org/nodejieba/download/nodejieba-2.2.6.tgz#17cd416705b7b01c062e6cd9d7179b30453eb4a3"
   dependencies:
     nan "~2.10.0"
 
